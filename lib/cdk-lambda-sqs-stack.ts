@@ -1,16 +1,37 @@
-import * as cdk from 'aws-cdk-lib';
-import { Construct } from 'constructs';
-// import * as sqs from 'aws-cdk-lib/aws-sqs';
+import * as cdk from "aws-cdk-lib";
+import { Runtime } from "aws-cdk-lib/aws-lambda";
+import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
+import { Construct } from "constructs";
+import path = require("path");
+//import  handler from "./src/handler"
+import * as sqs from "aws-cdk-lib/aws-sqs";
 
 export class CdkLambdaSqsStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // The code that defines your stack goes here
+    const queue = new sqs.Queue(this, "userInputQueue", {
+      //contentBasedDeduplication: true,
+    });
 
-    // example resource
-    // const queue = new sqs.Queue(this, 'CdkLambdaSqsQueue', {
-    //   visibilityTimeout: cdk.Duration.seconds(300)
-    // });
+    const fn = new NodejsFunction(this, "Lambda", {
+      runtime: Runtime.NODEJS_20_X,
+
+      entry: path.join(__dirname, "../src/handler.ts"),
+      handler: "handler",
+      environment: {
+        QUEUE_URL: queue.queueUrl,
+      },
+    });
+
+    const api = new cdk.aws_apigateway.LambdaRestApi(this, "userInput", {
+      handler: fn,
+      proxy: false,
+    });
+
+    const userRoute = api.root.addResource("user");
+    userRoute.addMethod("POST");
+
+    queue.grantSendMessages(fn);
   }
 }
