@@ -29,9 +29,10 @@ export const handler = async (
       body: "data received",
     };
   }
-
-  return {
-    statusCode: 500,
-    body: userData.error.toString(),
-  };
+  if (userData.error) {
+    return {
+      statusCode: 400,
+      body: userData.error.toString(),
+    };
+  }
 };
