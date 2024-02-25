@@ -6,7 +6,7 @@ import path = require("path");
 //import  handler from "./src/handler"
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
-
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 export class CdkLambdaSqsStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -44,6 +44,10 @@ export class CdkLambdaSqsStack extends cdk.Stack {
 
     queue.grantSendMessages(fn);
 
+    const table = new dynamodb.TableV2(this, "UserTable", {
+      partitionKey: { name: "pk", type: dynamodb.AttributeType.STRING },
+    });
+
     const receivingLambda = new NodejsFunction(this, "Receiving Lambda", {
       runtime: Runtime.NODEJS_20_X,
 
@@ -52,6 +56,7 @@ export class CdkLambdaSqsStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(25),
       environment: {
         QUEUE_URL: queue.queueUrl,
+        DB: table.tableName,
       },
     });
     queue.grantConsumeMessages(receivingLambda);
@@ -59,5 +64,7 @@ export class CdkLambdaSqsStack extends cdk.Stack {
     const eventSource = new SqsEventSource(queue);
 
     receivingLambda.addEventSource(eventSource);
+
+    table.grantWriteData(receivingLambda);
   }
 }
