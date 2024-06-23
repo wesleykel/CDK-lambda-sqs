@@ -14,37 +14,43 @@ export const handler = async (): Promise<void> => {
     QueueUrl: process.env.QUEUE_URL,
     AttributeNames: ["All"],
     MessageAttributeNames: ["firstName", "lastName"],
-    MaxNumberOfMessages: 5, //works with 1
+    MaxNumberOfMessages: 1, //works with 1
     VisibilityTimeout: 1, // this works (but, obviously, at a cost 🙁 )
-    WaitTimeSeconds: 20,
+    WaitTimeSeconds: 5,
   });
   const response: ReceiveMessageCommandOutput = await sqsClient.send(command);
 
-  console.log(response); //.Message;
+  //.Message;
   //delete message
   if (response.Messages) {
     // console.log(response.Messages[0].ReceiptHandle);
-
-    response.Messages.forEach(async (message) => {
+    console.log(response);
+    response.Messages.forEach(async (message, index) => {
       const input = {
         QueueUrl: process.env.QUEUE_URL,
         ReceiptHandle: message.ReceiptHandle,
       };
-      try {
-        const dbCommand = new PutItemCommand({
-          TableName: process.env.DB, // required
+      if (message.Body) {
+        let newMessage = JSON.parse(message.Body);
+        console.log(newMessage);
+        try {
+          const dbCommand = new PutItemCommand({
+            TableName: process.env.DB, // required
 
-          Item: {
-            // Item to be written
-            pk: { S: `${message.MessageId}` },
-          },
-        });
-        await dbClient.send(dbCommand);
-        new DeleteMessageCommand(input);
-      } catch (error) {
-        console.error(error);
+            Item: {
+              // Item to be written
+              pk: { S: `${newMessage.firstName}` },
+              sk: { S: `${newMessage.lastName}` },
+              email: { S: `${newMessage.email}` },
+              postCode: { S: `${newMessage.postCode}` },
+            },
+          });
+          await dbClient.send(dbCommand);
+          new DeleteMessageCommand(input);
+        } catch (error) {
+          console.error(error);
+        }
       }
-
       console.log("item sent to db");
       console.log(`Deleting  message ${message.ReceiptHandle}`);
     });
